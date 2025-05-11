@@ -1,0 +1,235 @@
+<!--Main page returned by our application instead of django page-->
+
+{% extends "app/layout.html" %} <!--html javascript in this file will be inherited from layout.html-->
+
+{% block content %} <!--wont be inhertited, specialized page specific content-->
+
+{% load static %}
+
+<!-- Import Leaflet CSS -->
+<link rel="stylesheet" href="{% static 'app/leaflet/leaflet.css' %}">
+
+<!--80 px offset from bottom so map dont overflow-->
+<!--style tag also contains css necessary for legend design of frontend interface-->
+<style>
+    #map {
+        height: calc(100vh - 80px) !important;
+    }
+    
+    /* Legend specific CSS code */
+	.legend {
+	padding: 6px 8px;
+	font: 14px Arial, Helvetica, sans-serif;
+	background: #000000;
+	background: rgba(0, 0, 0, 0.8);
+	/*box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);*/
+	/*border-radius: 5px;*/
+	line-height: 24px;
+	color: #fff;
+	}
+	.legend h4 {
+	text-align: center;
+	font-size: 16px;
+	margin: 2px 12px 8px;
+	color: #fff;
+	}
+
+	.legend span {
+	position: relative;
+	bottom: 3px;
+	}
+
+	.legend i {
+	width: 18px;
+	height: 18px;
+	float: left;
+	margin: 0 8px 0 0;
+	opacity: 0.7;
+	}
+
+	.legend i.icon {
+	background-size: 18px;
+	background-color: rgb(255, 255, 255);
+	}
+
+</style>
+
+<div id="map"></div>
+
+<!-- Import Leaflet JS -->
+<script src="{% static 'app/jquery/dist/jquery.min.js' %}"></script>
+<script src="{% static 'app/leaflet/leaflet.js' %}"></script>
+
+<!--custom javascript script -->
+<script type="text/javascript"> 
+
+    //Url Endpoints
+    var dataUrl='{%url "quakedataset" %}'; // will make request (call) url endpoint 'quakedataset' from urls.py (it creates url o backend and calls that url (localhost:8000/quake_dataset) to fetch data we need)
+    // this url called below as: "$.getJSON(dataUrl, function(data)"
+    // when we make more Url endpoints, we will define their names and call them here (similar to how we called 'quakedataset' name from urls.py) 
+
+    //Adding url for our prediction dataset i.e ML based endpoint for prediction
+    var predUrl='{%url "quakedatasetpred" %}'; //name given in urls.py to this ML prediction endpoint
+
+    var predRisk='{%url "quakedatasetpredrisk" %}';
+    
+    // Basemap urls
+    var osm_map = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+		attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+	});
+
+    // add more basemap urls as we will be creating more basemaps to add layer control to our application
+    // now that map displayed, we now display the data we have in our postgres DB table and use that tableto display data on our map in form of markers
+    // these are all added tiles below
+    var osm_humanitarian = L.tileLayer('http://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+		attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+	});
+	var esri_dark_gray_base = L.tileLayer('http://services.arcgisonline.com/arcgis/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+		attribution: '&copy; <a href="http://services.arcgisonline.com/arcgis/rest/services">ESRI</a> arcgisonline'
+	});
+	var world_ocean_base = L.tileLayer('http://services.arcgisonline.com/arcgis/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', {
+		attribution: '&copy; <a href="http://services.arcgisonline.com/arcgis/rest/services">ESRI</a> arcgisonline'
+	});
+	var world_street_map = L.tileLayer('http://services.arcgisonline.com/arcgis/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+		attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012'
+	});
+	var world_imagery = L.tileLayer('http://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+		attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+	});
+
+    // initialize the map with map variable
+    var map = L.map('map', { //any code starting with "L." is leaflet js code
+        layers: [world_ocean_base] // Default basemap
+    }).setView([8.7832, 34.5085], 3) // set default view of map to any region
+
+    // initialize basemaps
+    var baseLayers = { // adding key value pairs of our base maps so this is how they will be displayed in the layers control
+        "Open Street Map": osm_map,
+        "OSM Humanitarian": osm_humanitarian,
+        "Dark Gray Base": esri_dark_gray_base,
+        "World Ocean Base": world_ocean_base, //dafault map
+        "World Street Map": world_street_map,
+        "World Imagery": world_imagery
+    }; //object ended
+
+    // Create layer groups
+    var marker_layers = L.layerGroup().addTo(map); // (add marker points or remove marker points from thr map). make relevant changes in $.getJSON(dataUrl, function(data) for this too as we will add each markers (layers) to this group
+    var point_layers = L.layerGroup().addTo(map);
+    var pred_point_layers = L.layerGroup().addTo(map); // Note: requirement says this is needed so we first made logic of ML code in notebook, second we created endpoint (REST, json or other if required), added url to redirect web application (/quake_dataset_predict), and now we are adding data into the frontend through this variable (layer group as variable) on which we will work on by creating its layers, markers and groups along with displaying logic and visual properties and event handling to do stuff to displayed data
+    var pred_risk_layers = L.layerGroup().addTo(map);
+
+
+    // Get marker layers (add marker points or remove marker points from thr map)
+    $.getJSON(dataUrl, function(data) { //variable (dataUrl) taken as argument, then we create a function and pass it a variable "data" where we will store the data that we got from making that url call to 'quakedataset'
+        $.each(data, function(i, item) { //iterate on data returned by dataUrl
+            //console.log(item); //see by printing that correct items are being displayed
+            var marker = L.marker(L.latLng(item.fields.Latitude, item.fields.Longitude))
+            marker.bindPopup("<h4>Magnitude: " + item.fields.Magnitude.toString() + "</h4>"); // detail: json "item" contains "fields" which contains "Longitude" sub-field we calling in leaflet.jss. can prit using console.log and go to "console" in chrome developer tools to verify result 
+ 
+            marker.on('mouseover', function(e) {
+                this.openPopup(); // event handler (function(e) is the event) to open popup of magnitude when mouse hovers over a marker
+            });
+            marker.on('mouseout', function(e) {
+                this.closePopup();
+            });
+            marker_layers.addLayer(marker); // each marker will be added as a layer to the layer group for each iteration. markers will be grouped in marker_layer group
+        });
+    });
+    
+    // Note: javascript code logic building
+    // after making marker layer group, we will make point layer group that will allow us to plot points on a map (i.e circular pointers instead of markers) 
+    // Get point layers (for this add another getjson function) we call the dataUrl and it gives us response that contains the data
+    $.getJSON(dataUrl, function(data) {
+        $.each(data, function(i, item) { // each statement will loop through the "data" variable to store each "row" of data in "item"
+            var cpoints = L.circle(L.latLng(item.fields.Latitude, item.fields.Longitude), {
+                color: '#009999', //adding property for each circle marker i.e navy blue color radius etc
+                radius: item.fields.Magnitude * 50000,
+                weight: 1.0,
+                fillOpacity: 0.7
+            });
+            cpoints.bindPopup("<h4>Magnitude: " + item.fields.Magnitude.toString() + "</h4>");
+            cpoints.on('mouseover', function(e) { // adding event handlers (function(e))
+                this.openPopup();
+            });
+            cpoints.on('mouseout', function(e) {
+                this.closePopup();
+            });
+            point_layers.addLayer(cpoints); // add each "circle marker" layer to the "point_layer" group so they can all be filtered and unfiltered by checking/unchecking the group on frontend
+        });
+    });
+
+    // working on frontend for the ML predicted data by creating layer (i.e get predicted point layers)
+    $.getJSON(predUrl, function(data) {
+        $.each(data, function(i, item) { // each statement will loop through the "data" variable to store each "row" of data in "item"
+            var cpoints_pred = L.circle(L.latLng(item.fields.Latitude, item.fields.Longitude), {
+                color: '#ccff33', //adding property for each circle marker i.e navy blue color radius etc
+                radius: item.fields.Magnitude * 50000,
+                weight: 1.0,
+                fillOpacity: 0.7
+            });
+            cpoints_pred.bindPopup("<h4>Magnitude: " + item.fields.Magnitude.toString() + "</h4>");
+            cpoints_pred.on('mouseover', function(e) { // adding event handlers (function(e))
+                this.openPopup();
+            });
+            cpoints_pred.on('mouseout', function(e) {
+                this.closePopup();
+            });
+            pred_point_layers.addLayer(cpoints_pred); // add each "circle marker" layer to the "point_layer" group so they can all be filtered and unfiltered by checking/unchecking the group on frontend
+        });
+    });
+
+    // get predicted high risk point layers
+    $.getJSON(predRisk, function(data) {
+        $.each(data, function(i, item) { // each statement will loop through the "data" variable to store each "row" of data in "item"
+            var cpoints_risk = L.circle(L.latLng(item.fields.Latitude, item.fields.Longitude), {
+                color: '#cc0000', //adding property for each circle marker i.e navy blue color radius etc
+                radius: item.fields.Magnitude * 50000,
+                weight: 1.0,
+                fillOpacity: 0.7
+            });
+            cpoints_risk.bindPopup("<h4>Magnitude: " + item.fields.Magnitude.toString() + "</h4>");
+            cpoints_risk.on('mouseover', function(e) { // adding event handlers (function(e))
+                this.openPopup();
+            });
+            cpoints_risk.on('mouseout', function(e) {
+                this.closePopup();
+            });
+            pred_risk_layers.addLayer(cpoints_risk); // add each "circle marker" layer to the "point_layer" group so they can all be filtered and unfiltered by checking/unchecking the group on frontend
+        });
+    });
+
+
+    //add overlay for each made layer (marker_layer, point_layer) to the layers control
+    var overlayMaps = {
+        "Quakes (1965 - 2016)": marker_layers,
+        "Points (1965 - 2016)": point_layers,
+        "Predicted Quakes (2017)": pred_point_layers, // adds overlay for this group of points being requested by this: $.getJSON(predUrl, function(data)
+        "High Risk Quakes (2017)": pred_risk_layers
+    };
+
+    //add overlay for each made layer (marker_layer, point_layer) to the layers control
+    L.control.layers(baseLayers, overlayMaps).addTo(map);
+
+    // add legends working with Leaflet javascript engine which was styled above using css in <style> tag
+    var legend=L.control({position: "bottomright"});
+
+    legend.onAdd=function(map) {
+        var div=L.DomUtil.create("div", "legend"); // this javascript line creates an html element for div and adding a class="legend" to which the css .legend style is being applied
+        div.innerHTML+="<h4>Earth Quakes</h4>"; // added a heading
+        div.innerHTML += '<i class="icon" style="background-image: url(http://logodesignfx.com/wp-content/uploads/2019/04/logo-lokasi-png-.jpg);background-repeat: no-repeat;"></i><span>Markers  (1965 - 2016)</span><br>';
+		div.innerHTML += '<i style="background: #009999"></i><span>Actual (1965 - 2016)</span><br>';
+        div.innerHTML += '<i style="background: #ccff33"></i><span>Predicted (2017)</span><br>';
+		div.innerHTML += '<i style="background: #cc0000"></i><span>High Risk Mag > 6.5 (2017)</span><br>';
+
+        return div;
+    } // styling of legend, and adding information to legend done
+
+    //now we add legend to the map
+    legend.addTo(map);
+
+</script>
+
+
+{% endblock %}
+
+<!--After having imported the ML model pipeline and making ML prediction end points, we ow make frontend refinements like adding layers control and therfore creating multiple basemaps in leafletjs, creating marker, point, predicted point layers and creating legends etc-->

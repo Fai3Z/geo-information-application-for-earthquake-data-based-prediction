@@ -1,0 +1,10 @@
+# goto geoQuaes1>settings and change database name and type (postgres)
+# include app ame in "installed apps" in settings.pyand include location static files will be included n, any serialization specification formats that eed to be addressed
+# next we move on creating the django model (we create a model in django and convert that model into a table)
+
+
+
+
+# after downloading conda (miniconda) we open jupyter notebook to do the ML part of the project.
+# Jupyter notebook will use environment libraries and not application libraries so we will reinstall pandas scikit-learn on our device by running terminal as administrator
+# or can simply run colab
