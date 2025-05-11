@@ -10,34 +10,44 @@ Using data from **1965-2016**, we train a model and predict potential earthquake
 
 ### 1. Clone the repository
 ```sh
-git clone <This repository's link>
+git clone https://github.com/Fai3Z/geo-information-application-for-earthquake-data-based-prediction.git
+```
 
-
-### 2. Create a virtual environment
-my environment was amed "envquake"
-
-python -m venv envquake
-source envquake/bin/activate  # On macOS/Linux
-envquake\Scripts\activate     # On Windows
-
-### 3. Install dependencies
-pip install -r requirements.txt
-
-Note: Additional dependencies that may be needed:
-gdal, django_admin_tools, pygdal, dj_database_url, dj_static, django_leaflet
-
-### 4. Running the Project
-You can run the project using:
-python manage.py runserver
-Then, open your browser and go to: 🔗 http://127.0.0.1:8000/
-
-Output:
-**(`output1.png` and `output2.png`)**
+### 2. Setting Up a Virtual Environment
+Before installing dependencies, create a virtual environment:
+Windows (my environment was named "envquake":
 
 ```sh
-git add README.md
-git commit -m "Added README file"
-git push origin main
+python -m venv envquake
+envquake\Scripts\activate
+```
+
+### 3. Installing Dependencies
+Run the following command to install required packages:
+
+```sh
+pip install -r requirements.txt
+```
+#### Some additional packages that may need to be installed:
+```sh
+pip install gdal django_admin_tools pygdal dj_database_url dj_static django_leaflet
+```
+
+### 4. Running the Project
+Once dependencies are installed, start the Django server:
+
+```sh
+python manage.py runserver
+```
+Now, open your browser and visit: 🔗 http://127.0.0.1:8000/
+
+### Expected Output
+![Description of Image](https://raw.githubusercontent.com//Fai3Z/geo-information-application-for-earthquake-data-based-prediction/main/output1.png)
+#### With markers
+![Description of Image](https://raw.githubusercontent.com//Fai3Z/geo-information-application-for-earthquake-data-based-prediction/main/output2.png)
+
+
+
 
 
 
