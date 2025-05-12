@@ -8,6 +8,8 @@ Using data from **1965-2016**, we train a model and predict potential earthquake
 
 ## Installation
 
+#### Note: Python version 3.7.4-3.7.6 recommended
+
 ### 1. Clone the repository
 ```sh
 git clone https://github.com/Fai3Z/geo-information-application-for-earthquake-data-based-prediction.git
